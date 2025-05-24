@@ -99,6 +99,13 @@ combo_t key_combos[COMBO_COUNT] = {
 #ifdef OLED_ENABLE
   #include "eeconfig.h"  // Required for reading config
   #include "host.h"  // Required for host_keyboard_led_state()
+  #define KEYSTROKE_EEPROM_ADDR 32 // EEPROM address for keystroke count
+  static uint32_t keystroke_count = 0; // Variable to store the keystroke count
+
+  // Function to rotate the OLED display
+  oled_rotation_t oled_init_user(oled_rotation_t rotation) {
+    return OLED_ROTATION_270;
+  }
 
   // Layer names for OLED display
   enum layer_names {
@@ -108,14 +115,7 @@ combo_t key_combos[COMBO_COUNT] = {
     LAYER_COUNT
   };
 
-  bool is_ctrl_gui_swapped(void) {
-      return (keymap_config.swap_lctl_lgui || keymap_config.swap_rctl_rgui);
-  }
-
-  oled_rotation_t oled_init_user(oled_rotation_t rotation) {
-    return OLED_ROTATION_270;
-  }
-
+  // Function to get the highest layer and return its name
   const char* get_layer_name(uint8_t layer) {
     switch (layer) {
         #define MIRYOKU_X(NAME, LABEL) case LAYER_##NAME: return LABEL;
@@ -125,6 +125,82 @@ combo_t key_combos[COMBO_COUNT] = {
     }
   }
 
+  // Function to check if Ctrl and GUI keys are swapped
+  bool is_ctrl_gui_swapped(void) {
+      return (keymap_config.swap_lctl_lgui || keymap_config.swap_rctl_rgui);
+  }
+
+  // Function to load the keystroke count from EEPROM
+  void load_keystroke_count(void) {
+    eeprom_read_block((void*)&keystroke_count, (const void*)KEYSTROKE_EEPROM_ADDR, sizeof(keystroke_count));
+  }
+
+  // Function to save the keystroke count to EEPROM
+  void save_keystroke_count(void) {
+    eeprom_update_block((const void*)&keystroke_count, (void*)KEYSTROKE_EEPROM_ADDR, sizeof(keystroke_count));
+  }
+
+  // Function to increment the keystroke count
+  bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    if (record->event.pressed) {
+      keystroke_count++;
+      save_keystroke_count();
+    }
+    return true;
+  }
+
+  // Function to format the keystroke count as a string
+  char* format_number_grouped(uint32_t num) {
+    static char buffer[32];
+    char digits[12];  // 10 digits max for uint32_t, + extra
+    char* out = buffer;
+    int len = 0;
+
+    // Convert number to string, right-aligned
+    snprintf(digits, sizeof(digits), "%lu", num);
+    len = strlen(digits);
+
+    // Calculate total padded length to nearest multiple of 3
+    int padded_len = len;
+    if (padded_len % 3 != 0) {
+      padded_len += 3 - (padded_len % 3);
+    }
+
+    int pad_zeros = padded_len - len;
+
+    // Write leading zeros
+    for (int i = 0; i < pad_zeros; i++) {
+      *out++ = '0';
+    }
+
+    // Copy digits
+    for (int i = 0; i < len; i++) {
+      *out++ = digits[i];
+    }
+
+    *out = '\0';
+
+    // Now split into 3-digit groups with commas
+    static char grouped[32];
+    char* g = grouped;
+    for (int i = 0; i < padded_len; i++) {
+      if (i > 0 && i % 3 == 0) {
+        *g++ = ',';
+        *g++ = ' ';
+      }
+      *g++ = buffer[i];
+    }
+    *g = '\0';
+
+    return grouped;
+  }
+
+  // Task to initialize the stored variables
+  void keyboard_post_init_user(void) {
+    load_keystroke_count(); // Your EEPROM or variable setup
+  }
+
+  // OLED task to display information
   bool oled_task_user(void) {
     if (is_keyboard_master()) {
         oled_clear();
@@ -166,6 +242,11 @@ combo_t key_combos[COMBO_COUNT] = {
         // Print WPM information
         oled_write_P(PSTR("WPM: "), false);
         oled_write(get_u8_str(get_current_wpm(), '0'), false);
+        oled_write_ln("", false);
+
+        // Print StatTrak information
+        oled_write_P(PSTR("\nStat Trak:"), false);
+        oled_write(format_number_grouped(keystroke_count), false);
         oled_write_ln("", false);
     }
 
