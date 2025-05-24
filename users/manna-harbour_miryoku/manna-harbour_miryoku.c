@@ -6,6 +6,7 @@
 #include QMK_KEYBOARD_H
 
 #include "manna-harbour_miryoku.h"
+#include "wpm.h"
 
 
 // Additional Features double tap guard
@@ -88,4 +89,50 @@ combo_t key_combos[COMBO_COUNT] = {
   #endif
   COMBO(thumbcombos_fun, KC_APP)
 };
+#endif
+
+// CUSTOM CONFIG
+
+// Layer names for OLED display
+enum layer_names {
+  #define MIRYOKU_X(NAME, LABEL) LAYER_##NAME,
+  MIRYOKU_LAYER_LIST
+  #undef MIRYOKU_X
+  LAYER_COUNT
+};
+
+// OLED display configuration
+#ifdef OLED_ENABLE
+oled_rotation_t oled_init_user(oled_rotation_t rotation) {
+  return OLED_ROTATION_270;
+}
+
+const char* get_layer_name(uint8_t layer) {
+  switch (layer) {
+      #define MIRYOKU_X(NAME, LABEL) case LAYER_##NAME: return LABEL;
+      MIRYOKU_LAYER_LIST
+      #undef MIRYOKU_X
+      default: return "Unknown";
+  }
+}
+
+bool oled_task_user(void) {
+  if (is_keyboard_master()) {
+      oled_clear();
+
+      uint8_t layer = get_highest_layer(layer_state);
+      if (layer == 0) {
+        layer = get_highest_layer(default_layer_state);
+      }
+      oled_write_P(PSTR("Layer"), false);
+      oled_write(get_layer_name(layer), false);
+      oled_write_P(PSTR("\nv2.3"), false);
+  } else {
+      oled_clear();
+      oled_write_P(PSTR("WPM: "), false);
+      oled_write(get_u8_str(get_current_wpm(), '0'), false);
+  }
+
+  return false;
+}
 #endif
