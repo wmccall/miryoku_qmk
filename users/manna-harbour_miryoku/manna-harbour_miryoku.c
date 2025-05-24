@@ -93,46 +93,82 @@ combo_t key_combos[COMBO_COUNT] = {
 
 // CUSTOM CONFIG
 
-// Layer names for OLED display
-enum layer_names {
-  #define MIRYOKU_X(NAME, LABEL) LAYER_##NAME,
-  MIRYOKU_LAYER_LIST
-  #undef MIRYOKU_X
-  LAYER_COUNT
-};
+
 
 // OLED display configuration
 #ifdef OLED_ENABLE
-oled_rotation_t oled_init_user(oled_rotation_t rotation) {
-  return OLED_ROTATION_270;
-}
+  #include "eeconfig.h"  // Required for reading config
+  #include "host.h"  // Required for host_keyboard_led_state()
 
-const char* get_layer_name(uint8_t layer) {
-  switch (layer) {
-      #define MIRYOKU_X(NAME, LABEL) case LAYER_##NAME: return LABEL;
-      MIRYOKU_LAYER_LIST
-      #undef MIRYOKU_X
-      default: return "Unknown";
-  }
-}
+  // Layer names for OLED display
+  enum layer_names {
+    #define MIRYOKU_X(NAME, LABEL) LAYER_##NAME,
+    MIRYOKU_LAYER_LIST
+    #undef MIRYOKU_X
+    LAYER_COUNT
+  };
 
-bool oled_task_user(void) {
-  if (is_keyboard_master()) {
-      oled_clear();
-
-      uint8_t layer = get_highest_layer(layer_state);
-      if (layer == 0) {
-        layer = get_highest_layer(default_layer_state);
-      }
-      oled_write_P(PSTR("Layer"), false);
-      oled_write(get_layer_name(layer), false);
-      oled_write_P(PSTR("\nv2.3"), false);
-  } else {
-      oled_clear();
-      oled_write_P(PSTR("WPM: "), false);
-      oled_write(get_u8_str(get_current_wpm(), '0'), false);
+  bool is_ctrl_gui_swapped(void) {
+      return (keymap_config.swap_lctl_lgui || keymap_config.swap_rctl_rgui);
   }
 
-  return false;
-}
+  oled_rotation_t oled_init_user(oled_rotation_t rotation) {
+    return OLED_ROTATION_270;
+  }
+
+  const char* get_layer_name(uint8_t layer) {
+    switch (layer) {
+        #define MIRYOKU_X(NAME, LABEL) case LAYER_##NAME: return LABEL;
+        MIRYOKU_LAYER_LIST
+        #undef MIRYOKU_X
+        default: return "Unknown";
+    }
+  }
+
+  bool oled_task_user(void) {
+    if (is_keyboard_master()) {
+        oled_clear();
+
+        // Print Layer information
+        uint8_t layer = get_highest_layer(layer_state);
+        if (layer == 0) {
+          layer = get_highest_layer(default_layer_state);
+        }
+        oled_write_P(PSTR("Layer"), false);
+        const char* layer_name = get_layer_name(layer);
+        oled_write_ln(layer_name, false);
+        if (strlen(layer_name) % 5 != 0) {
+            oled_write_ln("", false);
+        }
+
+        // Print SWAP status
+        if (keymap_config.swap_lctl_lgui || keymap_config.swap_rctl_rgui) {
+            oled_write_P(PSTR("+SWAP"), true);
+        } else {
+            oled_write_P(PSTR("-SWAP"), false);
+        }
+        oled_write_ln("", false);
+
+        // Print Caps Lock status
+        if (host_keyboard_led_state().caps_lock) {
+            oled_write_P(PSTR("+CAPS"), true);
+        } else {
+            oled_write_P(PSTR("-CAPS"), false);
+        }
+        oled_write_ln("", false);
+
+        // Print Software Version
+        oled_write_P(PSTR("v2.4"), false);
+        oled_write_ln("", false);
+    } else {
+        oled_clear();
+
+        // Print WPM information
+        oled_write_P(PSTR("WPM: "), false);
+        oled_write(get_u8_str(get_current_wpm(), '0'), false);
+        oled_write_ln("", false);
+    }
+
+    return false;
+  }
 #endif
