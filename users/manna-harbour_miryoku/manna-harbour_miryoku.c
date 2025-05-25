@@ -252,18 +252,18 @@ combo_t key_combos[COMBO_COUNT] = {
         oled_write_ln("", false);
 
         // Print Software Version
-        oled_write_P(PSTR("v2.5"), false);
+        oled_write_P(PSTR("v3.0"), false);
         oled_write_ln("", false);
     } else {
         oled_clear();
 
         // Print WPM information
-        oled_write_P(PSTR("WPM: \n"), false);
+        oled_write_P(PSTR("WPM: \n "), false);
         oled_write(get_u8_str(get_current_wpm(), '0'), false);
         oled_write_ln("\n", false);
 
         // Print StatTrak information
-        oled_write_P(PSTR("\nStat Trak:\n"), false);
+        oled_write_P(PSTR("\nStat Trak:\n "), false);
         oled_write(format_number_grouped(keystroke_count), false);
         oled_write_ln("\n", false);
     }
