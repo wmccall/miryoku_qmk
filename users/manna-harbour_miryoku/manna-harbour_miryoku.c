@@ -6,8 +6,12 @@
 #include QMK_KEYBOARD_H
 
 #include "manna-harbour_miryoku.h"
-#include "wpm.h"
 
+// Custom Imports
+#include "wpm.h" // Required for wpm calculation
+#include "transactions.h" // Required for transaction RPC
+#include "eeconfig.h"  // Required for reading config
+#include "host.h"  // Required for host_keyboard_led_state()
 
 // Additional Features double tap guard
 
@@ -97,8 +101,6 @@ combo_t key_combos[COMBO_COUNT] = {
 
 // OLED display configuration
 #ifdef OLED_ENABLE
-  #include "eeconfig.h"  // Required for reading config
-  #include "host.h"  // Required for host_keyboard_led_state()
   #define KEYSTROKE_EEPROM_ADDR 32 // EEPROM address for keystroke count
   static uint32_t keystroke_count = 0; // Variable to store the keystroke count
 
@@ -147,6 +149,21 @@ combo_t key_combos[COMBO_COUNT] = {
       save_keystroke_count();
     }
     return true;
+  }
+
+  void stat_trak_sub_handler(uint8_t in_buflen, const void* in_data, uint8_t out_buflen, void* out_data) {
+    const uint32_t* in_keystroke_count = (const uint32_t*)in_data;
+    keystroke_count = *in_keystroke_count;
+  }
+
+  void housekeeping_task_user(void) {
+    if (is_keyboard_master()) {
+      // Interact with sub every 500ms
+      static uint32_t last_sync = 0;
+      if (timer_elapsed32(last_sync) > 500) {
+        transaction_rpc_send(STAT_TRAK, sizeof(keystroke_count), &keystroke_count);
+      }
+    }
   }
 
   // Function to format the keystroke count as a string
@@ -198,6 +215,7 @@ combo_t key_combos[COMBO_COUNT] = {
   // Task to initialize the stored variables
   void keyboard_post_init_user(void) {
     load_keystroke_count(); // Your EEPROM or variable setup
+    transaction_register_rpc(STAT_TRAK, stat_trak_sub_handler);
   }
 
   // OLED task to display information
@@ -234,20 +252,20 @@ combo_t key_combos[COMBO_COUNT] = {
         oled_write_ln("", false);
 
         // Print Software Version
-        oled_write_P(PSTR("v2.4"), false);
+        oled_write_P(PSTR("v2.5"), false);
         oled_write_ln("", false);
     } else {
         oled_clear();
 
         // Print WPM information
-        oled_write_P(PSTR("WPM: "), false);
+        oled_write_P(PSTR("WPM: \n"), false);
         oled_write(get_u8_str(get_current_wpm(), '0'), false);
-        oled_write_ln("", false);
+        oled_write_ln("\n", false);
 
         // Print StatTrak information
-        oled_write_P(PSTR("\nStat Trak:"), false);
+        oled_write_P(PSTR("\nStat Trak:\n"), false);
         oled_write(format_number_grouped(keystroke_count), false);
-        oled_write_ln("", false);
+        oled_write_ln("\n", false);
     }
 
     return false;

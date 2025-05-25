@@ -6,6 +6,7 @@
 #pragma once
 
 #define SPLIT_WPM_ENABLE
+#define SPLIT_TRANSACTION_IDS_USER STAT_TRAK
 
 #define XXX KC_NO
 #define SWAP QK_MAGIC_SWAP_CTL_GUI
