@@ -104,6 +104,11 @@ combo_t key_combos[COMBO_COUNT] = {
   #define KEYSTROKE_EEPROM_ADDR 32 // EEPROM address for keystroke count
   static uint32_t keystroke_count = 0; // Variable to store the keystroke count
   static bool oled_screensaver_active = false; // Variable to track if the OLED screensaver is active
+  #define M_WID 5
+  #define M_HEIGHT 16
+  #define CHAR_START 33  // Start of visible ASCII
+  #define CHAR_END 126   // End of visible ASCII
+  #define M_INTERVAL 100 // ms between updates
 
   // Function to rotate the OLED display
   oled_rotation_t oled_init_user(oled_rotation_t rotation) {
@@ -219,12 +224,6 @@ combo_t key_combos[COMBO_COUNT] = {
     transaction_register_rpc(STAT_TRAK, stat_trak_sub_handler);
   }
 
-  #define M_WID 5
-  #define M_HEIGHT 16
-  #define CHAR_START 33  // Start of visible ASCII
-  #define CHAR_END 126   // End of visible ASCII
-  #define M_INTERVAL 100 // ms between updates
-
   static uint32_t last_matrix_update = 0;
   static char matrix_chars[M_HEIGHT][M_WID];
   static uint8_t matrix_pos[M_WID] = {0};
@@ -298,7 +297,7 @@ combo_t key_combos[COMBO_COUNT] = {
         oled_write_ln("", false);
 
         // Print Software Version
-        oled_write_P(PSTR("v3.2"), false);
+        oled_write_P(PSTR("v3.4"), false);
         oled_write_ln("", false);
       } else {
         oled_clear();
@@ -330,7 +329,7 @@ combo_t key_combos[COMBO_COUNT] = {
     // If idle, render the animation.
     if (oled_screensaver_active) {
       // Use some render animation
-      render_animation();
+      // render_animation();
       return false;
     }
     return false;
