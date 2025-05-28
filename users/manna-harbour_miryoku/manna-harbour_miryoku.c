@@ -110,6 +110,8 @@ combo_t key_combos[COMBO_COUNT] = {
   #define CHAR_END 126   // End of visible ASCII
   #define M_INTERVAL 100 // ms between updates
 
+  static char blank_chars[M_HEIGHT][M_WID];
+
   // Function to rotate the OLED display
   oled_rotation_t oled_init_user(oled_rotation_t rotation) {
     return OLED_ROTATION_270;
@@ -222,6 +224,11 @@ combo_t key_combos[COMBO_COUNT] = {
   void keyboard_post_init_user(void) {
     load_keystroke_count(); // Your EEPROM or variable setup
     transaction_register_rpc(STAT_TRAK, stat_trak_sub_handler);
+    for (int col = 0; col < M_WID; col++) {
+      for (int row = 0; row < M_HEIGHT; row++) {
+        blank_chars[row][col] = ' ';
+      }
+    }
   }
 
   static uint32_t last_matrix_update = 0;
@@ -259,12 +266,25 @@ combo_t key_combos[COMBO_COUNT] = {
     }
   }
 
+  void print_blank(void) {
+    for (int row = 0; row < M_HEIGHT; row++) {
+      oled_set_cursor(0, row);
+      for (int col = 0; col < M_WID; col++) {
+        oled_write_char(blank_chars[row][col], false);
+      }
+    }
+  }
+
   // OLED task to display information
   bool oled_task_user(void) {
     if(last_input_activity_elapsed() < OLED_SHORT_TIMEOUT) {
       // Turn the OLED on and get current layer state
-      oled_on();
-      oled_screensaver_active = false;
+      if (!is_oled_on() || oled_screensaver_active) {
+        oled_on();
+        print_blank(); // Load the keystroke count from EEPROM
+        oled_screensaver_active = false;
+        return false;
+      }
       if (is_keyboard_master()) {
         oled_clear();
 
@@ -297,7 +317,7 @@ combo_t key_combos[COMBO_COUNT] = {
         oled_write_ln("", false);
 
         // Print Software Version
-        oled_write_P(PSTR("v3.4"), false);
+        oled_write_P(PSTR("v3.5"), false);
         oled_write_ln("", false);
       } else {
         oled_clear();
@@ -329,7 +349,7 @@ combo_t key_combos[COMBO_COUNT] = {
     // If idle, render the animation.
     if (oled_screensaver_active) {
       // Use some render animation
-      // render_animation();
+      render_animation();
       return false;
     }
     return false;

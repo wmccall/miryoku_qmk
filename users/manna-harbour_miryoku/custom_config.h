@@ -13,7 +13,7 @@
 #define UNSWAP QK_MAGIC_UNSWAP_CTL_GUI
 
 #define OLED_SHORT_TIMEOUT 60000
-#define OLED_LONG_TIMEOUT 61000
+#define OLED_LONG_TIMEOUT 120000
 
 // Notice: FPS friendly tap layer
 #define MIRYOKU_LAYER_GAME \
