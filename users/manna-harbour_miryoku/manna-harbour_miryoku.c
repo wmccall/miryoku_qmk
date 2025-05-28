@@ -103,6 +103,7 @@ combo_t key_combos[COMBO_COUNT] = {
 #ifdef OLED_ENABLE
   #define KEYSTROKE_EEPROM_ADDR 32 // EEPROM address for keystroke count
   static uint32_t keystroke_count = 0; // Variable to store the keystroke count
+  static bool oled_screensaver_active = false; // Variable to track if the OLED screensaver is active
 
   // Function to rotate the OLED display
   oled_rotation_t oled_init_user(oled_rotation_t rotation) {
@@ -218,9 +219,54 @@ combo_t key_combos[COMBO_COUNT] = {
     transaction_register_rpc(STAT_TRAK, stat_trak_sub_handler);
   }
 
+  #define M_WID 5
+  #define M_HEIGHT 16
+  #define CHAR_START 33  // Start of visible ASCII
+  #define CHAR_END 126   // End of visible ASCII
+  #define M_INTERVAL 100 // ms between updates
+
+  static uint32_t last_matrix_update = 0;
+  static char matrix_chars[M_HEIGHT][M_WID];
+  static uint8_t matrix_pos[M_WID] = {0};
+
+  void render_animation(void) {
+    if (timer_elapsed32(last_matrix_update) < M_INTERVAL) return;
+    last_matrix_update = timer_read32();
+
+    // Advance character positions
+    for (int col = 0; col < M_WID; col++) {
+      matrix_pos[col] = (matrix_pos[col] + 1) % M_HEIGHT;
+      for (int row = 0; row < M_HEIGHT; row++) {
+        if (row == matrix_pos[col]) {
+          // Generate a random printable ASCII character
+          matrix_chars[row][col] = (char)(CHAR_START + (rand() % (CHAR_END - CHAR_START)));
+        } else {
+          // Leave previous char or blank
+          if (rand() % 3 == 0) {
+            matrix_chars[row][col] = ' ';
+          }
+        }
+      }
+    }
+
+    oled_clear();
+
+    // Print matrix to OLED
+    for (int row = 0; row < M_HEIGHT; row++) {
+      oled_set_cursor(0, row);
+      for (int col = 0; col < M_WID; col++) {
+        oled_write_char(matrix_chars[row][col], false);
+      }
+    }
+  }
+
   // OLED task to display information
   bool oled_task_user(void) {
-    if (is_keyboard_master()) {
+    if(last_input_activity_elapsed() < OLED_SHORT_TIMEOUT) {
+      // Turn the OLED on and get current layer state
+      oled_on();
+      oled_screensaver_active = false;
+      if (is_keyboard_master()) {
         oled_clear();
 
         // Print Layer information
@@ -232,42 +278,61 @@ combo_t key_combos[COMBO_COUNT] = {
         const char* layer_name = get_layer_name(layer);
         oled_write_ln(layer_name, false);
         if (strlen(layer_name) % 5 != 0) {
-            oled_write_ln("", false);
+          oled_write_ln("", false);
         }
 
         // Print SWAP status
         if (keymap_config.swap_lctl_lgui || keymap_config.swap_rctl_rgui) {
-            oled_write_P(PSTR("+SWAP"), true);
+          oled_write_P(PSTR("+SWAP"), true);
         } else {
-            oled_write_P(PSTR("-SWAP"), false);
+          oled_write_P(PSTR("-SWAP"), false);
         }
         oled_write_ln("", false);
 
         // Print Caps Lock status
         if (host_keyboard_led_state().caps_lock) {
-            oled_write_P(PSTR("+CAPS"), true);
+          oled_write_P(PSTR("+CAPS"), true);
         } else {
-            oled_write_P(PSTR("-CAPS"), false);
+          oled_write_P(PSTR("-CAPS"), false);
         }
         oled_write_ln("", false);
 
         // Print Software Version
-        oled_write_P(PSTR("v3.0"), false);
+        oled_write_P(PSTR("v3.2"), false);
         oled_write_ln("", false);
-    } else {
+      } else {
         oled_clear();
-
         // Print WPM information
+        uint8_t wpm = get_current_wpm();
         oled_write_P(PSTR("WPM: \n "), false);
-        oled_write(get_u8_str(get_current_wpm(), '0'), false);
-        oled_write_ln("\n", false);
+        if (wpm < 2) {
+          oled_write("000", false);
+        } else {
+          oled_write(get_u8_str(wpm, '0'), false);
+        }
+        oled_write_ln("", false);
 
         // Print StatTrak information
         oled_write_P(PSTR("\nStat Trak:\n "), false);
         oled_write(format_number_grouped(keystroke_count), false);
-        oled_write_ln("\n", false);
+        oled_write_ln("", false);
+      }
+      return false;
     }
-
+    // If the oled is on, but has been idle for longer than the screensaver time, turn the OLED off
+    if(is_oled_on() && last_input_activity_elapsed() > OLED_LONG_TIMEOUT) {
+      oled_off();
+      oled_screensaver_active = false;
+    // If the OLED is on, but has been idle for a while, turn the screensaver on
+    } else if(is_oled_on() && last_input_activity_elapsed() > OLED_SHORT_TIMEOUT) {
+      oled_screensaver_active = true;
+    }
+    // If idle, render the animation.
+    if (oled_screensaver_active) {
+      // Use some render animation
+      render_animation();
+      return false;
+    }
     return false;
   }
 #endif
