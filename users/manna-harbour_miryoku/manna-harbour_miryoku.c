@@ -104,6 +104,7 @@ combo_t key_combos[COMBO_COUNT] = {
   #define KEYSTROKE_EEPROM_ADDR 32 // EEPROM address for keystroke count
   static uint32_t keystroke_count = 0; // Variable to store the keystroke count
   static bool oled_screensaver_active = false; // Variable to track if the OLED screensaver is active
+  static bool oled_cleared = false; // Variable to track if the OLED has been cleared
   #define M_WID 5
   #define M_HEIGHT 16
   #define CHAR_START 33  // Start of visible ASCII
@@ -273,6 +274,7 @@ combo_t key_combos[COMBO_COUNT] = {
         oled_write_char(blank_chars[row][col], false);
       }
     }
+    oled_cleared = true; // Mark that the OLED has been cleared
   }
 
   // OLED task to display information
@@ -285,6 +287,7 @@ combo_t key_combos[COMBO_COUNT] = {
         oled_screensaver_active = false;
         return false;
       }
+      oled_cleared = false; // Reset cleared state when OLED is active
       if (is_keyboard_master()) {
         oled_clear();
 
@@ -340,6 +343,10 @@ combo_t key_combos[COMBO_COUNT] = {
     }
     // If the oled is on, but has been idle for longer than the screensaver time, turn the OLED off
     if(is_oled_on() && last_input_activity_elapsed() > OLED_LONG_TIMEOUT) {
+      if (!oled_cleared) {
+        print_blank();
+        return false;
+      }
       oled_off();
       oled_screensaver_active = false;
     // If the OLED is on, but has been idle for a while, turn the screensaver on
@@ -349,6 +356,7 @@ combo_t key_combos[COMBO_COUNT] = {
     // If idle, render the animation.
     if (oled_screensaver_active) {
       // Use some render animation
+      oled_cleared = false; // Reset cleared state for animation
       render_animation();
       return false;
     }
