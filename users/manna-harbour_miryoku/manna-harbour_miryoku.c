@@ -103,6 +103,16 @@ combo_t key_combos[COMBO_COUNT] = {
 #ifdef OLED_ENABLE
   #define KEYSTROKE_EEPROM_ADDR 32 // EEPROM address for keystroke count
   static uint32_t keystroke_count = 0; // Variable to store the keystroke count
+  #define KEYSTROKE_B_EEPROM_ADDR 33 // EEPROM address for keystroke count
+  static uint32_t keystroke_count_b = 0; // Variable to store the previous keystroke count for comparison
+
+  typedef struct {
+    uint32_t keystroke_count;
+    uint32_t keystroke_count_b;
+  } keystroke_stats_t;
+
+  static keystroke_stats_t keystroke_stats = {0};
+
   static bool oled_screensaver_active = false; // Variable to track if the OLED screensaver is active
   static bool oled_cleared = false; // Variable to track if the OLED has been cleared
   #define M_WID 5
@@ -142,27 +152,33 @@ combo_t key_combos[COMBO_COUNT] = {
   }
 
   // Function to load the keystroke count from EEPROM
-  void load_keystroke_count(void) {
+  void load_keystroke_counts(void) {
     eeprom_read_block((void*)&keystroke_count, (const void*)KEYSTROKE_EEPROM_ADDR, sizeof(keystroke_count));
+    eeprom_read_block((void*)&keystroke_count_b, (const void*)KEYSTROKE_B_EEPROM_ADDR, sizeof(keystroke_count_b));
   }
 
   // Function to save the keystroke count to EEPROM
-  void save_keystroke_count(void) {
+  void save_keystroke_counts(void) {
     eeprom_update_block((const void*)&keystroke_count, (void*)KEYSTROKE_EEPROM_ADDR, sizeof(keystroke_count));
+    eeprom_update_block((const void*)&keystroke_count_b, (void*)KEYSTROKE_B_EEPROM_ADDR, sizeof(keystroke_count_b));
   }
 
   // Function to increment the keystroke count
   bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (record->event.pressed) {
       keystroke_count++;
-      save_keystroke_count();
+      keystroke_count_b++;
+      save_keystroke_counts();
     }
     return true;
   }
 
   void stat_trak_sub_handler(uint8_t in_buflen, const void* in_data, uint8_t out_buflen, void* out_data) {
-    const uint32_t* in_keystroke_count = (const uint32_t*)in_data;
-    keystroke_count = *in_keystroke_count;
+    if (in_buflen < sizeof(keystroke_stats_t)) return;
+
+    const keystroke_stats_t* in_stats = (const keystroke_stats_t*)in_data;
+    keystroke_count = in_stats->keystroke_count;
+    keystroke_count_b = in_stats->keystroke_count_b;
   }
 
   void housekeeping_task_user(void) {
@@ -170,7 +186,9 @@ combo_t key_combos[COMBO_COUNT] = {
       // Interact with sub every 500ms
       static uint32_t last_sync = 0;
       if (timer_elapsed32(last_sync) > 500) {
-        transaction_rpc_send(STAT_TRAK, sizeof(keystroke_count), &keystroke_count);
+        keystroke_stats.keystroke_count = keystroke_count;
+        keystroke_stats.keystroke_count_b = keystroke_count_b;
+        transaction_rpc_send(STAT_TRAK, sizeof(keystroke_stats), &keystroke_stats);
       }
     }
   }
@@ -223,7 +241,7 @@ combo_t key_combos[COMBO_COUNT] = {
 
   // Task to initialize the stored variables
   void keyboard_post_init_user(void) {
-    load_keystroke_count(); // Your EEPROM or variable setup
+    load_keystroke_counts(); // Your EEPROM or variable setup
     transaction_register_rpc(STAT_TRAK, stat_trak_sub_handler);
     for (int col = 0; col < M_WID; col++) {
       for (int row = 0; row < M_HEIGHT; row++) {
@@ -304,7 +322,7 @@ combo_t key_combos[COMBO_COUNT] = {
         }
 
         // Print SWAP status
-        if (keymap_config.swap_lctl_lgui || keymap_config.swap_rctl_rgui) {
+        if (is_ctrl_gui_swapped()) {
           oled_write_P(PSTR("+SWAP"), true);
         } else {
           oled_write_P(PSTR("-SWAP"), false);
@@ -320,13 +338,13 @@ combo_t key_combos[COMBO_COUNT] = {
         oled_write_ln("", false);
 
         // Print Software Version
-        oled_write_P(PSTR("v3.5"), false);
+        oled_write_P(PSTR("v3.6"), false);
         oled_write_ln("", false);
       } else {
         oled_clear();
         // Print WPM information
         uint8_t wpm = get_current_wpm();
-        oled_write_P(PSTR("WPM: \n "), false);
+        oled_write_P(PSTR("WPM--\n "), false);
         if (wpm < 2) {
           oled_write("000", false);
         } else {
@@ -335,8 +353,11 @@ combo_t key_combos[COMBO_COUNT] = {
         oled_write_ln("", false);
 
         // Print StatTrak information
-        oled_write_P(PSTR("\nStat Trak:\n "), false);
+        oled_write_P(PSTR("\nA----\n "), false);
         oled_write(format_number_grouped(keystroke_count), false);
+        oled_write_ln("", false);
+        oled_write_P(PSTR("\nB----\n "), false);
+        oled_write(format_number_grouped(keystroke_count_b), false);
         oled_write_ln("", false);
       }
       return false;
