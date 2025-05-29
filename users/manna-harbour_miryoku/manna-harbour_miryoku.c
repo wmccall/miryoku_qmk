@@ -13,6 +13,11 @@
 #include "eeconfig.h"  // Required for reading config
 #include "host.h"  // Required for host_keyboard_led_state()
 
+enum custom_keycodes {
+  RESET_KEYSTROKE = SAFE_RANGE,
+  RESET_KEYSTROKE_B,
+};
+
 // Additional Features double tap guard
 
 enum {
@@ -103,6 +108,8 @@ combo_t key_combos[COMBO_COUNT] = {
 #ifdef OLED_ENABLE
   #define KEYSTROKE_EEPROM_ADDR 32 // EEPROM address for keystroke count
   static uint32_t keystroke_count = 0; // Variable to store the keystroke count
+  #define KEYSTROKE_B_EEPROM_ADDR (KEYSTROKE_EEPROM_ADDR + sizeof(uint32_t)) // EEPROM address for keystroke count
+  static uint32_t keystroke_count_b = 0; // Variable to store the keystroke count
   static bool oled_screensaver_active = false; // Variable to track if the OLED screensaver is active
   static bool oled_cleared = false; // Variable to track if the OLED has been cleared
   #define M_WID 5
@@ -145,17 +152,39 @@ combo_t key_combos[COMBO_COUNT] = {
   void load_keystroke_count(void) {
     eeprom_read_block((void*)&keystroke_count, (const void*)KEYSTROKE_EEPROM_ADDR, sizeof(keystroke_count));
   }
+  // Function to load the keystroke count from EEPROM
+  void load_keystroke_b_count(void) {
+    eeprom_read_block((void*)&keystroke_count_b, (const void*)KEYSTROKE_B_EEPROM_ADDR, sizeof(keystroke_count_b));
+  }
 
   // Function to save the keystroke count to EEPROM
   void save_keystroke_count(void) {
     eeprom_update_block((const void*)&keystroke_count, (void*)KEYSTROKE_EEPROM_ADDR, sizeof(keystroke_count));
   }
+  // Function to save the keystroke count to EEPROM
+  void save_keystroke_b_count(void) {
+    eeprom_update_block((const void*)&keystroke_count_b, (void*)KEYSTROKE_B_EEPROM_ADDR, sizeof(keystroke_count_b));
+  }
 
   // Function to increment the keystroke count
   bool process_record_user(uint16_t keycode, keyrecord_t *record) {
     if (record->event.pressed) {
-      keystroke_count++;
-      save_keystroke_count();
+      switch (keycode) {
+        case RESET_KEYSTROKE:
+          keystroke_count = 0;
+          save_keystroke_count();
+          break;
+        case RESET_KEYSTROKE_B:
+          keystroke_count_b = 0;
+          save_keystroke_b_count();
+          break;
+        default:
+          keystroke_count++;
+          keystroke_count_b++;
+          save_keystroke_count();
+          save_keystroke_b_count();
+          break;
+      }
     }
     return true;
   }
@@ -165,12 +194,18 @@ combo_t key_combos[COMBO_COUNT] = {
     keystroke_count = *in_keystroke_count;
   }
 
+  void stat_trak_b_sub_handler(uint8_t in_buflen, const void* in_data, uint8_t out_buflen, void* out_data) {
+    const uint32_t* in_keystroke_count_b = (const uint32_t*)in_data;
+    keystroke_count_b = *in_keystroke_count_b;
+  }
+
   void housekeeping_task_user(void) {
     if (is_keyboard_master()) {
       // Interact with sub every 500ms
       static uint32_t last_sync = 0;
       if (timer_elapsed32(last_sync) > 500) {
         transaction_rpc_send(STAT_TRAK, sizeof(keystroke_count), &keystroke_count);
+        transaction_rpc_send(STAT_TRAK_B, sizeof(keystroke_count_b), &keystroke_count_b);
       }
     }
   }
@@ -225,8 +260,10 @@ combo_t key_combos[COMBO_COUNT] = {
   void keyboard_post_init_user(void) {
     if (is_keyboard_master()) {
       load_keystroke_count(); // Your EEPROM or variable setup
+      load_keystroke_b_count();
     }
     transaction_register_rpc(STAT_TRAK, stat_trak_sub_handler);
+    transaction_register_rpc(STAT_TRAK_B, stat_trak_b_sub_handler);
     for (int col = 0; col < M_WID; col++) {
       for (int row = 0; row < M_HEIGHT; row++) {
         blank_chars[row][col] = ' ';
@@ -322,7 +359,7 @@ combo_t key_combos[COMBO_COUNT] = {
         oled_write_ln("", false);
 
         // Print Software Version
-        oled_write_P(PSTR("v3.8"), false);
+        oled_write_P(PSTR("v3.9"), false);
         oled_write_ln("", false);
       } else {
         oled_clear();
@@ -339,6 +376,9 @@ combo_t key_combos[COMBO_COUNT] = {
         // Print StatTrak information
         oled_write_P(PSTR("\nA----\n "), false);
         oled_write(format_number_grouped(keystroke_count), false);
+        oled_write_ln("", false);
+        oled_write_P(PSTR("\nB----\n "), false);
+        oled_write(format_number_grouped(keystroke_count_b), false);
         oled_write_ln("", false);
       }
       return false;
