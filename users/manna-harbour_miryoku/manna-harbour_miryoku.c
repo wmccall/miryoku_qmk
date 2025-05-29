@@ -112,6 +112,8 @@ combo_t key_combos[COMBO_COUNT] = {
   static uint32_t keystroke_count_b = 0; // Variable to store the keystroke count
   static bool oled_screensaver_active = false; // Variable to track if the OLED screensaver is active
   static bool oled_cleared = false; // Variable to track if the OLED has been cleared
+  static uint32_t last_sync = 0;
+  static uint32_t last_save = 0;
   #define M_WID 5
   #define M_HEIGHT 16
   #define CHAR_START 33  // Start of visible ASCII
@@ -172,17 +174,13 @@ combo_t key_combos[COMBO_COUNT] = {
       switch (keycode) {
         case RESET_KEYSTROKE:
           keystroke_count = 0;
-          save_keystroke_count();
           break;
         case RESET_KEYSTROKE_B:
           keystroke_count_b = 0;
-          save_keystroke_b_count();
           break;
         default:
           keystroke_count++;
           keystroke_count_b++;
-          save_keystroke_count();
-          save_keystroke_b_count();
           break;
       }
     }
@@ -201,11 +199,17 @@ combo_t key_combos[COMBO_COUNT] = {
 
   void housekeeping_task_user(void) {
     if (is_keyboard_master()) {
-      // Interact with sub every 500ms
-      static uint32_t last_sync = 0;
-      if (timer_elapsed32(last_sync) > 500) {
+      // Interact with sub every 100ms
+      if (timer_elapsed32(last_sync) > 100) {
+        last_sync = timer_read32();
         transaction_rpc_send(STAT_TRAK, sizeof(keystroke_count), &keystroke_count);
         transaction_rpc_send(STAT_TRAK_B, sizeof(keystroke_count_b), &keystroke_count_b);
+      }
+      // Save the keystroke count every 10 seconds
+      if (timer_elapsed32(last_save) > 10000) {
+        last_save = timer_read32();
+        save_keystroke_count();
+        save_keystroke_b_count();
       }
     }
   }
@@ -359,7 +363,7 @@ combo_t key_combos[COMBO_COUNT] = {
         oled_write_ln("", false);
 
         // Print Software Version
-        oled_write_P(PSTR("v3.9"), false);
+        oled_write_P(PSTR("v3.10"), false);
         oled_write_ln("", false);
       } else {
         oled_clear();
