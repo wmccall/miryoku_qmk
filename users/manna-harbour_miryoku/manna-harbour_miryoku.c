@@ -363,7 +363,7 @@ combo_t key_combos[COMBO_COUNT] = {
         oled_write_ln("", false);
 
         // Print Software Version
-        oled_write_P(PSTR("v3.11"), false);
+        oled_write_P(PSTR("v3.12"), false);
         oled_write_ln("", false);
       } else {
         oled_clear();
