@@ -16,6 +16,11 @@
 enum custom_keycodes {
   RESET_KEYSTROKE = SAFE_RANGE,
   RESET_KEYSTROKE_B,
+  ML_SHIFT,      // Mouseless shift tap
+  ML_CTRL_CMD,   // Ctrl tap (or Cmd if swapped)
+  ML_ALT,        // Alt tap
+  ML_CMD_CTRL,   // Cmd tap (or Ctrl if swapped)
+  ML_COMMA,      // Comma with proper hold behavior
 };
 
 // Additional Features double tap guard
@@ -168,8 +173,50 @@ combo_t key_combos[COMBO_COUNT] = {
     eeprom_update_block((const void*)&keystroke_count_b, (void*)KEYSTROKE_B_EEPROM_ADDR, sizeof(keystroke_count_b));
   }
 
+  // Helper to tap a key and count the keystroke
+  void tap_and_count(uint16_t keycode) {
+    tap_code(keycode);
+    keystroke_count++;
+    keystroke_count_b++;
+  }
+
+  // Helper to hold a key (register on press, unregister on release) and count
+  void hold_and_count(uint16_t keycode, keyrecord_t *record) {
+    if (record->event.pressed) {
+      register_code(keycode);
+      keystroke_count++;
+      keystroke_count_b++;
+    } else {
+      unregister_code(keycode);
+    }
+  }
+
   // Function to increment the keystroke count
   bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    // Handle ML_COMMA - hold to repeat
+    if (keycode == ML_COMMA) {
+      hold_and_count(KC_COMM, record);
+      return false;
+    }
+
+    // Handle mouseless.click keys - send taps on press
+    if (record->event.pressed) {
+      switch (keycode) {
+        case ML_SHIFT:
+          tap_and_count(KC_LSFT);
+          return false;
+        case ML_CTRL_CMD:
+          tap_and_count(is_ctrl_gui_swapped() ? KC_LGUI : KC_LCTL);
+          return false;
+        case ML_ALT:
+          tap_and_count(KC_LALT);
+          return false;
+        case ML_CMD_CTRL:
+          tap_and_count(is_ctrl_gui_swapped() ? KC_LCTL : KC_LGUI);
+          return false;
+      }
+    }
+
     if (record->event.pressed) {
       switch (keycode) {
         case RESET_KEYSTROKE:
@@ -363,7 +410,7 @@ combo_t key_combos[COMBO_COUNT] = {
         oled_write_ln("", false);
 
         // Print Software Version
-        oled_write_P(PSTR("v3.12"), false);
+        oled_write_P(PSTR("v3.14"), false);
         oled_write_ln("", false);
       } else {
         oled_clear();

@@ -41,6 +41,14 @@ KC_LGUI,           KC_LALT,           KC_LCTL,           KC_LSFT,           U_NA
 U_NA,              KC_ALGR,           TD(U_TD_U_NUM),    TD(U_TD_U_NAV),    U_NA,              KC_INS,            KC_HOME,           KC_PGDN,           KC_PGUP,           KC_END,            \
 U_NP,              U_NP,              U_NA,              U_NA,              U_NA,              KC_ENT,            KC_BSPC,           KC_DEL,            U_NP,              U_NP
 
+// Notice: Mouseless.click layer - J=Shift, K=Ctrl/Cmd, L=Alt, '=Cmd/Ctrl (swap-aware)
+// U, I, O, and comma pass through
+#define MIRYOKU_LAYER_MOUSE \
+U_NA,              U_NA,              U_NA,              U_NA,              U_NA,              U_NA,              KC_U,              KC_I,              KC_O,              U_NA,              \
+ML_CMD_CTRL,       ML_ALT,            ML_CTRL_CMD,       ML_SHIFT,          U_NA,              U_NA,              ML_SHIFT,          ML_CTRL_CMD,       ML_ALT,            ML_CMD_CTRL,       \
+U_NA,              U_NA,              U_NA,              U_NA,              U_NA,              U_NA,              U_NA,              ML_COMMA,          U_NA,              U_NA,              \
+U_NP,              U_NP,              U_NA,              U_NA,              U_NA,              U_NA,              U_NA,              U_NA,              U_NP,              U_NP
+
 #define MIRYOKU_LAYER_LIST \
 MIRYOKU_X(BASE,   "Base") \
 MIRYOKU_X(EXTRA,  "Extra") \
