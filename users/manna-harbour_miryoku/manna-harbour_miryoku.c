@@ -16,11 +16,18 @@
 enum custom_keycodes {
   RESET_KEYSTROKE = SAFE_RANGE,
   RESET_KEYSTROKE_B,
-  ML_SHIFT,      // Mouseless shift tap
-  ML_CTRL_CMD,   // Ctrl tap (or Cmd if swapped)
-  ML_ALT,        // Alt tap
-  ML_CMD_CTRL,   // Cmd tap (or Ctrl if swapped)
-  ML_COMMA,      // Comma with proper hold behavior
+  // Left-side mouseless modifiers
+  ML_LSHIFT,
+  ML_LCTRL_CMD,   // Ctrl tap (or Cmd if swapped)
+  ML_LALT,
+  ML_LCMD_CTRL,   // Cmd tap (or Ctrl if swapped)
+  // Right-side mouseless modifiers
+  ML_RSHIFT,
+  ML_RCTRL_CMD,
+  ML_RALT,
+  ML_RCMD_CTRL,
+  // Other
+  ML_COMMA,
 };
 
 // Additional Features double tap guard
@@ -202,17 +209,31 @@ combo_t key_combos[COMBO_COUNT] = {
     // Handle mouseless.click keys - send taps on press
     if (record->event.pressed) {
       switch (keycode) {
-        case ML_SHIFT:
+        // Left modifiers
+        case ML_LSHIFT:
           tap_and_count(KC_LSFT);
           return false;
-        case ML_CTRL_CMD:
+        case ML_LCTRL_CMD:
           tap_and_count(is_ctrl_gui_swapped() ? KC_LGUI : KC_LCTL);
           return false;
-        case ML_ALT:
+        case ML_LALT:
           tap_and_count(KC_LALT);
           return false;
-        case ML_CMD_CTRL:
+        case ML_LCMD_CTRL:
           tap_and_count(is_ctrl_gui_swapped() ? KC_LCTL : KC_LGUI);
+          return false;
+        // Right modifiers
+        case ML_RSHIFT:
+          tap_and_count(KC_RSFT);
+          return false;
+        case ML_RCTRL_CMD:
+          tap_and_count(is_ctrl_gui_swapped() ? KC_RGUI : KC_RCTL);
+          return false;
+        case ML_RALT:
+          tap_and_count(KC_RALT);
+          return false;
+        case ML_RCMD_CTRL:
+          tap_and_count(is_ctrl_gui_swapped() ? KC_RCTL : KC_RGUI);
           return false;
       }
     }
@@ -410,7 +431,7 @@ combo_t key_combos[COMBO_COUNT] = {
         oled_write_ln("", false);
 
         // Print Software Version
-        oled_write_P(PSTR("v3.14"), false);
+        oled_write_P(PSTR("v3.15"), false);
         oled_write_ln("", false);
       } else {
         oled_clear();
